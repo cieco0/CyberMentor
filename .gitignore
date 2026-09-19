@@ -1,0 +1,28 @@
+# Données personnelles et fichiers générés
+data/
+backups/
+models/
+output/
+tmp/
+*.sqlite*
+*.db
+*.log
+*.pid
+*.zip
+*.pdf
+*.docx
+*.mp4
+*.mp3
+# Environnements et identifiants
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+.codex/
+.claude/
+auth.json
+credentials.json
+.DS_Store
+Thumbs.db
