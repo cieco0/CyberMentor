@@ -1,6 +1,7 @@
 """Persistent multiple-choice questions with server-side correction."""
 import json
 import re
+import study
 
 
 def migrate(db):
@@ -76,6 +77,7 @@ def turn(db,sid,document_id,section_id,question,expected_id,sources,settings,gen
         if q['selected'] is not None:raise ValueError('Réponse déjà corrigée. Passe à la question suivante.')
         selected=ord(choice[1].upper())-65
         db.execute('UPDATE quizzes SET selected=? WHERE id=?',(selected,q['id']))
+        study.record(db,q['id'])
         options=json.loads(q['options']);correct=q['correct']
         answer=('Bonne réponse !' if selected==correct else 'Pas tout à fait.')+f"\n\nLa bonne réponse est **{chr(65+correct)}. {options[correct]}**.\n\n**Pourquoi :** {q['explanation']}"
         return answer,json.loads(q['sources']),q['id']

@@ -13,6 +13,7 @@ function rich(value){return value.split(/```/).map((part,index)=>index%2?'<pre><
 function empty(title,text){return `<div class="empty"><strong>${esc(title)}</strong>${esc(text)}</div>`}
 function date(value){return new Date(value).toLocaleDateString('fr-BE',{day:'numeric',month:'short',year:'numeric'})}
 function render(){
+ renderStudy();
  const linked=state.settings.model.startsWith('account:');$('account-active-notice').hidden=!linked;if(linked){$('account-consent').checked=true;$('account-model').value=state.settings.model;}$('account-active-notice').textContent='Compte actif : '+state.settings.model.replace('account:','')+' — questions et extraits de cours envoyés au fournisseur.';
  const due=state.cards.filter(c=>new Date(c.due)<=new Date());
  $('nav-count').textContent=state.documents.length;
@@ -97,7 +98,7 @@ $('rename-session').addEventListener('click',async()=>{const title=prompt('Nom d
 form('memory-form',async()=>{await api('memories',{text:$('memory-text').value});$('memory-form').reset();await refresh();notify('Mémorisé pour les prochaines sessions.')});
 $('chat-file').addEventListener('change',async()=>{if(busy)return;const files=[...$('chat-file').files];if(!files.length)return;try{$('chat-file').disabled=true;const results=await importBatch(files,{certification:$('chat-cert').value,prepare:true,detailed:true},'chat-batch');await refresh();const doc=results.find(r=>r.id&&!r.media);if(doc)await newSession(doc.id);notify('Imports terminés. Les analyses vidéo se poursuivent en arrière-plan.')}catch(e){notify(e.message,true)}finally{$('chat-file').value='';$('chat-file').disabled=busy}});
 document.addEventListener('click',async e=>{const b=e.target.closest('button');if(!b)return;try{
- if(b.dataset.session){if(busy)return;activeSession=Number(b.dataset.session);localStorage.setItem('cybermentor-session',activeSession);await refresh(true);$('chat-mode').value='auto';$('question').value=''}
+ if(b.dataset.session){if(busy)return;view('mentor');activeSession=Number(b.dataset.session);localStorage.setItem('cybermentor-session',activeSession);await refresh(true);$('chat-mode').value='auto';$('question').value=''}
  if(b.dataset.prompt){if(busy)return;if(b.dataset.mode)$('chat-mode').value=b.dataset.mode;nextAction=b.dataset.action||null;$('question').value=b.dataset.prompt;$('chat-form').requestSubmit()}
  if(b.dataset.course)openCourse(Number(b.dataset.course),Number(b.dataset.section)||null);
  if(b.dataset.retry)await prepare(b.dataset.kind,b.dataset.doc);
@@ -110,7 +111,7 @@ document.addEventListener('click',async e=>{const b=e.target.closest('button');i
  }catch(err){notify(err.message,true);b.disabled=false}});
 let pollBusy=false;
 setInterval(async()=>{if(!state||pollBusy||busy||![...state.jobs,...(state.media_jobs||[])].some(j=>['running','queued'].includes(j.status)))return;pollBusy=true;const requested=activeSession;try{const data=await api('state?session_id='+requested);if(requested!==activeSession||busy)return;state=data;token=state.token;renderLearning();renderMessages()}catch(e){/* A server restart is handled on the next explicit action. */}finally{pollBusy=false}},2500);
-refresh(true).then(()=>{view(location.hash.slice(1)||'mentor');engine()}).catch(async e=>{if(activeSession!==1){activeSession=1;localStorage.setItem('cybermentor-session',1);try{await refresh(true);view('mentor');engine();return}catch{}}notify('Impossible de charger les données : '+e.message,true)});
+refresh(true).then(()=>{view(location.hash.slice(1)||'accueil');engine()}).catch(async e=>{if(activeSession!==1){activeSession=1;localStorage.setItem('cybermentor-session',1);try{await refresh(true);view('mentor');engine();return}catch{}}notify('Impossible de charger les données : '+e.message,true)});
 
 
 
@@ -215,7 +216,8 @@ function quizMessage(message){
 }
 function quizControls(message){
  const q=state.quiz;if(!q||q.message_id!==message.id)return '';
- if(q.selected!==null||q.invalid_reason||q.verified===false)return `<div class="quiz-choices"><button class="primary" data-quiz-next="${q.id}" ${busy?'disabled':''}>Question suivante →</button></div>`;
+ if(q.invalid_reason)return `<p class="job-error">${esc(q.invalid_reason)}</p><button data-quiz-next="${q.id}">Nouvelle question →</button>`;
+ if(q.selected!==null||q.verified===false)return `<div class="quiz-choices"><button class="primary" data-quiz-next="${q.id}" ${busy?'disabled':''}>Question suivante →</button><button data-report-quiz="${q.id}">Signaler une question ambiguë</button></div>`;
  return '<div class="quiz-choices" role="group" aria-label="Choisir une réponse">'+q.options.map((o,i)=>`<button data-quiz-option="${i}" data-quiz-id="${q.id}" ${busy?'disabled':''}>${String.fromCharCode(65+i)}. ${esc(o)}</button>`).join('')+'</div>';
 }
 document.addEventListener('click',e=>{const b=e.target.closest('[data-quiz-option],[data-quiz-next]');if(!b||busy)return;const q=state.quiz;if(!q)return;$('chat-document').value=q.document_id||'';$('chat-mode').value='quiz';nextAction=null;quizReplyId=q.id;$('question').value=b.dataset.quizOption!==undefined?String.fromCharCode(65+Number(b.dataset.quizOption)):'Question suivante du QCM';$('chat-form').requestSubmit()});
@@ -323,4 +325,31 @@ $('delete-installed').addEventListener('click',async()=>{
  const name=$('installed-models').value;if(!name||!confirm('Supprimer le modèle '+name+' du PC ? Tes cours et discussions seront conservés. Tu pourras le télécharger à nouveau.'))return;
  const b=$('delete-installed');b.disabled=true;
  try{await api('models/delete',{model:name});await engine();notify('Modèle supprimé : '+name)}catch(e){notify(e.message,true);await refreshInstalled()}finally{installedSelection()}
+});
+
+function renderStudy(){
+ const reviews=state.study_reviews||[],due=reviews.filter(r=>new Date(r.due)<=new Date());
+ const cards=state.cards.filter(c=>new Date(c.due)<=new Date());
+ const recent=state.sessions.find(s=>s.document_id&&state.documents.some(d=>d.id===s.document_id));
+ $('study-actions').innerHTML=`<article class="panel"><span class="eyebrow">01 · APPRENDRE</span><h2>Reprendre mon cours</h2><p>${recent?esc(recent.title):'Ajoute un support pour commencer ton parcours.'}</p>${recent?`<button class="primary" data-session="${recent.id}">Reprendre →</button>`:'<button class="primary" data-view="cours">Ajouter mon premier cours →</button>'}</article><article class="panel"><span class="eyebrow">02 · RETENIR</span><h2>Réviser mes difficultés</h2><p>${due.length} difficulté(s) et ${cards.length} carte(s) à revoir aujourd’hui.</p><button data-view="revisions">Ouvrir mes révisions →</button></article><article class="panel"><span class="eyebrow">03 · PRATIQUER</span><h2>Faire un exercice</h2><p>Un QCM, une explication avec tes mots ou un lab guidé.</p><button data-view="entrainement">Choisir ma séance →</button></article>`;
+ $('study-focus').innerHTML=due.length?due.slice(0,3).map(r=>`<div class="study-focus-item"><strong>${esc(r.question)}</strong><p class="muted small">${esc(r.document_title||'Connaissances générales')}</p><button data-view="revisions">Revoir la correction →</button></div>`).join(''):empty('Rien d’urgent à réviser',reviews.length?'Tes prochaines révisions sont planifiées. Tu peux commencer un exercice.':'Tes futures erreurs de QCM apparaîtront ici, avec leurs sources.');
+ const selected=$('practice-document').value;
+ $('practice-document').innerHTML=state.documents.length?state.documents.map(d=>`<option value="${d.id}">${esc(d.title)}</option>`).join(''):'<option value="">Ajoute un support dans Mes cours</option>';
+ if(state.documents.some(d=>String(d.id)===selected))$('practice-document').value=selected;
+ $('practice-form').querySelector('button').disabled=!state.documents.length;
+ const reviewCard=r=>{const ready=new Date(r.due)<=new Date();return `<article class="panel study-review"><span class="tag">${ready?'À revoir maintenant':'Prochain rappel : '+date(r.due)}</span><h3>${esc(r.question)}</h3><p class="muted small">${esc(r.document_title||'Connaissances générales')} · ${r.reviews} révision(s) déclarée(s)</p><details><summary>Comprendre la correction et lire la source</summary><div class="summary-body">${rich(r.explanation)}</div>${r.sources.length?sources(r.sources):'<p>Pas de source de cours : connaissances générales du modèle.</p>'}<p class="muted small">Explique d’abord la réponse avec tes mots. « Compris » espace le rappel, sans certifier la maîtrise.</p>${ready?`<div class="hero-actions"><button data-study-rate="${r.quiz_id}" data-rating="again">Encore difficile · dans 10 min</button><button data-study-rate="${r.quiz_id}" data-rating="good">Compris · rappel plus tard</button></div>`:''}</details><div class="hero-actions"><button data-study-practice="${r.quiz_id}">M’exercer sur cette notion</button><button data-report-quiz="${r.quiz_id}">Signaler la question</button></div></article>`};
+ $('study-reviews').innerHTML=reviews.length?due.map(reviewCard).join('')+`<details class="spaced"><summary>Révisions planifiées (${reviews.length-due.length})</summary>${reviews.filter(r=>new Date(r.due)>new Date()).map(reviewCard).join('')}</details>`:empty('Aucune difficulté enregistrée','Après une erreur sur un QCM validé, la correction et la source seront conservées ici.');
+}
+form('practice-form',async()=>{
+ await newSession(Number($('practice-document').value));const mode=$('practice-mode').value;$('chat-mode').value=mode;
+ const prompts={quiz:'Pose-moi une question de QCM sur ce cours, attends mon choix puis explique la correction.',teachback:'Demande-moi d’expliquer une notion de ce cours avec mes mots, attends ma réponse puis corrige mon raisonnement.',lab:'Propose un petit lab sur ce cours. Demande d’abord mon environnement de laboratoire et mon niveau. Une seule étape à la fois, explique chaque commande et attends mon résultat avant de continuer.',expliquer:'Choisis une notion de ce cours, explique-la simplement avec un exemple, puis pose-moi une question pour vérifier ma compréhension.'};
+ $('question').value=prompts[mode];$('chat-form').requestSubmit();
+});
+document.addEventListener('click',async event=>{
+ const b=event.target.closest('[data-study-rate],[data-study-practice],[data-report-quiz]');if(!b||busy)return;b.disabled=true;
+ try{
+ if(b.dataset.studyRate){await api('study/rate',{id:Number(b.dataset.studyRate),grade:b.dataset.rating});await refresh();notify('Prochain rappel enregistré.')}
+ if(b.dataset.reportQuiz){if(!confirm('Signaler cette question comme ambiguë ? Elle sera exclue des révisions et ne sera plus évaluée.'))return;await api('quiz/report',{id:Number(b.dataset.reportQuiz)});await refresh();notify('Question signalée et exclue du suivi.')}
+ if(b.dataset.studyPractice){const r=state.study_reviews.find(x=>x.quiz_id===Number(b.dataset.studyPractice));await newSession(r.document_id,r.section_id);$('chat-mode').value='quiz';$('question').value=('Crée un autre QCM pour retravailler la notion de cette ancienne question, avec une formulation différente : '+r.question).slice(0,8000);$('chat-form').requestSubmit()}
+ }catch(e){notify(e.message,true)}finally{b.disabled=false}
 });

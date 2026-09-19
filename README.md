@@ -13,6 +13,15 @@ Assistant personnel pour apprendre la cybersécurité, organiser ses cours et pr
 
 **Arreter.cmd** arrête le serveur. Fermer le navigateur ne l’arrête pas. N’expose pas ce serveur personnel sur Internet : il écoute uniquement sur `127.0.0.1`.
 
+## Étudier au quotidien
+
+- **Accueil** : reprendre la dernière discussion de cours, voir les révisions dues ou choisir un exercice.
+- **Mes cours** : organiser les supports et leurs résumés.
+- **M’entraîner** : QCM, explication avec tes mots, exemple ou lab guidé étape par étape.
+- **Mes révisions** : les erreurs sur les QCM validés conservent leur correction et leurs extraits sources. Choisis « À revoir » pour un rappel dans dix minutes, ou « Compris » pour espacer les rappels (1, 2, 4 jours, jusqu’à 30 jours). Ce choix est une autoévaluation, pas une preuve de maîtrise.
+- Une question ambiguë peut être signalée depuis la correction ou les révisions ; elle est alors exclue du suivi.
+- Les réglages, la bibliothèque et les objectifs sont regroupés sous **Organiser mon espace**.
+
 ## Ce qui est inclus
 
 - Import multiple de PDF avec texte sélectionnable, DOCX, TXT et Markdown.

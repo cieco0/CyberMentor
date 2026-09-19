@@ -10,3 +10,8 @@
 .model-choice{padding:18px 0;border-bottom:1px solid var(--border,#303b45)}
 .model-choice:last-child{border-bottom:0}
 .model-choice h3{margin:12px 0 8px}.model-choice-actions{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+
+.study-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.study-actions .panel{display:flex;flex-direction:column;align-items:start}.study-actions h2{font-size:23px;margin:14px 0}.study-actions p{flex:1;color:var(--muted);line-height:1.6}.study-actions button{margin-top:14px}.study-focus-item{padding:16px 0;border-bottom:1px solid var(--line)}.study-review{margin:16px 0}.study-review summary{cursor:pointer;padding:12px 0;font-weight:600}.nav-more{margin-top:18px}.nav-more summary{cursor:pointer;font-size:12px;color:var(--muted);padding:12px}.nav-more button{display:block;width:100%;text-align:left}.study-review .source{margin-top:10px}button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--mint);outline-offset:4px}#practice-form{max-width:760px}#accueil h1{font-size:clamp(32px,4vw,52px)}
+@media(max-width:1100px){.study-actions{grid-template-columns:1fr}.study-actions .panel{padding:22px}.study-actions p{margin:8px 0}.study-actions h2{margin:8px 0}}@media(max-width:760px){.nav-more{margin:0;min-width:165px}.nav-more summary{white-space:nowrap}.study-review .hero-actions{display:flex;flex-direction:column;align-items:stretch}.study-actions{gap:12px}}
+
+@media(max-width:760px){nav{flex-wrap:wrap;overflow:visible}nav>button{flex:1 1 135px;white-space:nowrap}.nav-more{flex:1 0 100%;min-width:0}.nav-more[open]{border-top:1px solid var(--line)}.nav-more button{white-space:normal}}

@@ -19,6 +19,7 @@ from urllib.parse import urlsplit, parse_qs
 import learning
 import media
 import quiz
+import study
 import hardware
 import accounts
 from model_update import ModelUpdate
@@ -67,6 +68,7 @@ def init():
         learning.migrate(db)
         media.migrate(db)
         quiz.migrate(db)
+        study.migrate(db)
 
 
 def clean(value, limit=1000, required=True):
@@ -327,7 +329,7 @@ def state(db, sid=1):
     if not db.execute('SELECT 1 FROM sessions WHERE id=?',(sid,)).fetchone():
         sid=db.execute('SELECT id FROM sessions ORDER BY updated DESC,id DESC LIMIT 1').fetchone()[0]
     current=learning.session(db,sid)
-    return {'quiz':quiz.public(db,sid), 'media_jobs':[dict(r) for r in db.execute('SELECT id,title,course_id,status,phase,progress,error,document_id,interval FROM media_jobs ORDER BY id DESC')], 'courses':[dict(r) for r in db.execute('SELECT * FROM courses ORDER BY name')], 'sections':[dict(r) for r in db.execute('SELECT * FROM course_sections ORDER BY first_page,id')], 'current_session':current,'sessions':[dict(r) for r in db.execute('SELECT * FROM sessions ORDER BY updated DESC,id DESC')], 'jobs':[dict(r) for r in db.execute('SELECT id,document_id,section_id,kind,status,progress,total,error FROM jobs ORDER BY id DESC')], 'memories':[dict(r) for r in db.execute('SELECT * FROM memories ORDER BY resolved,id DESC')], 'settings':json.loads(db.execute('SELECT value FROM settings').fetchone()[0]), 'documents':[dict(r) for r in db.execute('SELECT d.*,count(c.id) chunks,max(c.page) last_page FROM documents d LEFT JOIN chunks c ON c.document_id=d.id GROUP BY d.id ORDER BY d.id DESC')], 'messages':[dict(r) | {'sources':json.loads(r['sources'])} for r in db.execute('SELECT * FROM (SELECT * FROM messages WHERE session_id=? ORDER BY id DESC LIMIT 100) ORDER BY id',(sid,))], 'certifications':[dict(r) for r in db.execute('SELECT * FROM certifications')], 'cards':[dict(r) for r in db.execute('SELECT * FROM cards ORDER BY due')], 'today':now()}
+    return {'study_reviews':study.state(db),'quiz':quiz.public(db,sid), 'media_jobs':[dict(r) for r in db.execute('SELECT id,title,course_id,status,phase,progress,error,document_id,interval FROM media_jobs ORDER BY id DESC')], 'courses':[dict(r) for r in db.execute('SELECT * FROM courses ORDER BY name')], 'sections':[dict(r) for r in db.execute('SELECT * FROM course_sections ORDER BY first_page,id')], 'current_session':current,'sessions':[dict(r) for r in db.execute('SELECT * FROM sessions ORDER BY updated DESC,id DESC')], 'jobs':[dict(r) for r in db.execute('SELECT id,document_id,section_id,kind,status,progress,total,error FROM jobs ORDER BY id DESC')], 'memories':[dict(r) for r in db.execute('SELECT * FROM memories ORDER BY resolved,id DESC')], 'settings':json.loads(db.execute('SELECT value FROM settings').fetchone()[0]), 'documents':[dict(r) for r in db.execute('SELECT d.*,count(c.id) chunks,max(c.page) last_page FROM documents d LEFT JOIN chunks c ON c.document_id=d.id GROUP BY d.id ORDER BY d.id DESC')], 'messages':[dict(r) | {'sources':json.loads(r['sources'])} for r in db.execute('SELECT * FROM (SELECT * FROM messages WHERE session_id=? ORDER BY id DESC LIMIT 100) ORDER BY id',(sid,))], 'certifications':[dict(r) for r in db.execute('SELECT * FROM certifications')], 'cards':[dict(r) for r in db.execute('SELECT * FROM cards ORDER BY due')], 'today':now()}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -447,7 +449,11 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/models/update':
                 return self.respond(202,MODEL_UPDATE.start(body.get('model')))
             with connect() as db:
-                if self.path == '/api/models/delete':
+                if self.path == '/api/study/rate':
+                    result=study.rate(db,int(body['id']),body.get('grade'))
+                elif self.path == '/api/quiz/report':
+                    result=study.report(db,int(body['id']))
+                elif self.path == '/api/models/delete':
                     locked=CHAT_LOCK.acquire(blocking=False)
                     if not locked:return self.respond(409,{'error':'Attends la fin de la réponse avant de supprimer un modèle.'})
                     result=delete_model(db,body.get('model'))
