@@ -24,6 +24,34 @@ class LearningTests(unittest.TestCase):
     def queue(self,doc,kind='summary'):
         with app.connect() as db:return learning.queue(db,doc,kind,'qwen2.5:7b')['id']
 
+    def test_citations_outside_the_input_are_flagged(self):
+        result=learning.check_page_references('Valide [p. 2]. Inventée [p. 99].',{2,3})
+        self.assertIn('[p. 2]',result)
+        self.assertNotIn('[p. 99]',result)
+        self.assertIn('référence à vérifier',result)
+
+    def test_overlap_removal_preserves_full_text_and_page_boundaries(self):
+        original=''.join(chr(33+i%90) for i in range(3700))
+        chunks=[{'page':1,'text':original[i:i+1300]} for i in range(0,len(original),1050)]
+        self.assertEqual(''.join(c['text'] for c in learning.reading_chunks(chunks)),original)
+        self.assertGreater(sum(len(c['text']) for c in chunks),len(original))
+        different=[{'page':1,'text':'a'*1300},{'page':2,'text':'a'*1300}]
+        self.assertEqual(learning.reading_chunks(different),different)
+
+    def test_small_summary_one_call_with_complete_source(self):
+        doc=self.document();jid=self.queue(doc);calls=[]
+        def generate(*args,**kwargs):calls.append(args[2]);return '## Notions essentielles\nUne synthèse expliquée. [p. 1]'
+        learning.run_job(app.connect,generate,jid)
+        self.assertEqual(len(calls),1)
+        self.assertIn('FIN_DU_COURS',calls[0])
+        with app.connect() as db:
+            row=db.execute('SELECT * FROM jobs WHERE id=?',(jid,)).fetchone()
+            result=json.loads(row['result'])
+            self.assertEqual(row['status'],'done')
+            self.assertEqual(row['total'],1)
+            self.assertEqual(result['pipeline'],2)
+            self.assertGreaterEqual(result['processing_seconds'],0)
+
     def test_length_limit_splits_and_resumes_completed_subparts(self):
         doc=self.document();jid=self.queue(doc)
         with app.connect() as db:job=dict(db.execute('SELECT * FROM jobs WHERE id=?',(jid,)).fetchone())

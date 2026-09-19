@@ -50,6 +50,14 @@ Au premier lancement, `data/mentor.sqlite3` est créée avec un profil génériq
 
 Pour sauvegarder ton utilisation future, utilise le bouton de sauvegarde dans Réglages. Ne publie pas cette sauvegarde dans le dépôt. Pour repartir de zéro, utilise une nouvelle copie du programme dans un autre dossier après avoir arrêté la précédente, sans copier son dossier `data`.
 
+## Résumés et performances
+
+Les nouvelles analyses éliminent les recouvrements exacts du découpage, sans retirer le texte original. Un petit support produit sa synthèse en un seul appel au modèle. Les documents longs restent traités par blocs avec reprise des étapes terminées. Les traitements déjà enregistrés conservent leur version de découpage.
+
+Les résumés privilégient les définitions, les méthodes ordonnées, les exemples et les points de vigilance. Les références au format `[p. N]` hors du bloc fourni sont signalées ; ce contrôle ne garantit pas l’exactitude des affirmations. Le temps de traitement est affiché pour les nouvelles analyses.
+
+La lecture à l’écran et les exports PDF utilisent des paragraphes espacés, des listes et des titres colorés : vert pour les notions, bleu pour les exemples, ambre pour la vigilance et violet pour les points à retenir. Les exports existants bénéficient de la présentation mise à jour au prochain téléchargement.
+
 ## Limites
 
 Le modèle n’est pas réentraîné : CyberMentor recherche des extraits et prépare des synthèses. La recherche est lexicale. Les réponses et les QCM peuvent contenir des erreurs : vérifie les informations importantes dans les sources. L’analyse vidéo utilise transcription et captures OCR, pas une compréhension continue des images. Les labs proposent des commandes à exécuter toi-même.

@@ -9,7 +9,21 @@ function view(name){if(!$(name)?.classList.contains('view'))name='accueil';docum
 document.addEventListener('click',e=>{const button=e.target.closest('[data-view]');if(button)view(button.dataset.view)});
 window.addEventListener('hashchange',()=>view(location.hash.slice(1)));
 function sources(items){return items.map((s,i)=>`<details class="source"><summary>[S${i+1}] ${esc(s.title)} · page/section ${s.page}</summary>${esc(s.text)}</details>`).join('')}
-function rich(value){return value.split(/```/).map((part,index)=>index%2?'<pre><code>'+esc(part.replace(/^\w*\n/,''))+'</code></pre>':esc(part).replace(/^#{1,6} (.+)$/gm,'<strong class="answer-heading">$1</strong>').replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`([^`\n]+)`/g,'<code>$1</code>')).join('')}
+function rich(value){
+ const inline=t=>esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/`([^`\n]+)`/g,'<code>$1</code>');
+ return String(value??'').split(/```/).map((part,index)=>{
+  if(index%2)return '<pre><code>'+esc(part.replace(/^\w*\n/,''))+'</code></pre>';
+  let html='',paragraph=[],list=null;
+  const flush=()=>{if(paragraph.length){html+='<p>'+inline(paragraph.join(' '))+'</p>';paragraph=[]}if(list){html+='</'+list+'>';list=null}};
+  for(const line of part.split('\n')){
+   const heading=line.match(/^\s*(#{1,6})\s+(.+)/), item=line.match(/^\s*(?:([-*•])|\d+[.)])\s+(.+)/);
+   if(!line.trim()){flush();continue}
+   if(heading){flush();const tone=/exemple/i.test(heading[2])?'example':/vigilance|attention|confusion|limite|ambigu/i.test(heading[2])?'warning':/retenir|essentiel/i.test(heading[2])?'key':'default';html+=`<h${Math.min(4,heading[1].length+1)} class="answer-heading tone-${tone}">${inline(heading[2])}</h${Math.min(4,heading[1].length+1)}>`}
+   else if(item){if(paragraph.length){html+='<p>'+inline(paragraph.join(' '))+'</p>';paragraph=[]}const type=item[1]?'ul':'ol';if(list!==type){if(list)html+='</'+list+'>';list=type;html+='<'+type+'>'}html+='<li>'+inline(item[2])+'</li>'}
+   else {if(list){html+='</'+list+'>';list=null}paragraph.push(line.trim())}
+  }flush();return html;
+ }).join('');
+}
 function empty(title,text){return `<div class="empty"><strong>${esc(title)}</strong>${esc(text)}</div>`}
 function date(value){return new Date(value).toLocaleDateString('fr-BE',{day:'numeric',month:'short',year:'numeric'})}
 function render(){
@@ -80,7 +94,7 @@ async function renderCourse(){
    for(const job of detail){
      html+=`<article class="panel spaced"><div class="panel-heading"><h2>${job.kind==='lesson'?'Résumé expliqué et détaillé':job.kind==='summary'?'Synthèse de la sélection':'Tes cartes proposées'}</h2><span class="tag">${esc(job.model)}</span></div>${jobStatus(job)}`;
      if(job.status==='error')html+=`<button data-retry="${job.id}" data-kind="${job.kind}" data-doc="${doc.id}">Réessayer</button>`;
-     if(job.result.summary)html+=`<p class="muted small">Toutes les ${job.result.chunks_read} portions de texte ont été lues en ${job.result.sections} section(s). Résumé généré à vérifier ; images et pages sans texte exclues.</p><div class="summary-body">${rich(job.result.summary)}</div><button data-export-job="${job.id}">↓ Exporter en Markdown</button> <a class="button" href="/api/jobs/${job.id}/pdf" download="cybermentor-resume-${job.id}.pdf">↓ Télécharger le PDF</a>`;
+     if(job.result.summary)html+=`<p class="muted small">${job.result.processing_seconds!=null?`Traitement : ${Math.round(job.result.processing_seconds)} s · `:''}Toutes les ${job.result.chunks_read} portions de texte ont été lues en ${job.result.sections} section(s). Résumé généré à vérifier ; images et pages sans texte exclues.</p><div class="summary-body">${rich(job.result.summary)}</div><button data-export-job="${job.id}">↓ Exporter en Markdown</button> <a class="button" href="/api/jobs/${job.id}/pdf" download="cybermentor-resume-${job.id}.pdf">↓ Télécharger le PDF</a>`;
      if(job.parts.length)html+=`<h3 class="spaced">Explications par bloc de lecture · ${job.parts.length}</h3>`+job.parts.map(p=>`<details class="source"><summary>Bloc ${p.ordinal+1} · pages/sections ${p.first_page}–${p.last_page}</summary><div class="summary-body">${rich(p.content)}</div></details>`).join('');
      if(job.result.cards)html+='<p class="muted small">Vérifie les questions, les réponses et les sources avant de les ajouter à tes révisions.</p>'+job.result.cards.map((c,i)=>`<article class="proposed-card"><h3>${esc(c.question)}</h3><p>${esc(c.answer)}</p>${c.source?`<details class="source"><summary>Source : ${esc(c.source.title)} · page/section ${c.source.page}</summary>${esc(c.source.text)}</details>`:''}<button data-accept-job="${job.id}" data-index="${i}" ${job.accepted.includes('job:'+job.id+':'+i)?'disabled':''}>${job.accepted.includes('job:'+job.id+':'+i)?'Ajoutée ✓':'Ajouter à mes révisions'}</button></article>`).join('');
      html+='</article>';
@@ -331,7 +345,7 @@ function renderStudy(){
  const reviews=state.study_reviews||[],due=reviews.filter(r=>new Date(r.due)<=new Date());
  const cards=state.cards.filter(c=>new Date(c.due)<=new Date());
  const recent=state.sessions.find(s=>s.document_id&&state.documents.some(d=>d.id===s.document_id));
- $('study-actions').innerHTML=`<article class="panel"><span class="eyebrow">01 · APPRENDRE</span><h2>Reprendre mon cours</h2><p>${recent?esc(recent.title):'Ajoute un support pour commencer ton parcours.'}</p>${recent?`<button class="primary" data-session="${recent.id}">Reprendre →</button>`:'<button class="primary" data-view="cours">Ajouter mon premier cours →</button>'}</article><article class="panel"><span class="eyebrow">02 · RETENIR</span><h2>Réviser mes difficultés</h2><p>${due.length} difficulté(s) et ${cards.length} carte(s) à revoir aujourd’hui.</p><button data-view="revisions">Ouvrir mes révisions →</button></article><article class="panel"><span class="eyebrow">03 · PRATIQUER</span><h2>Faire un exercice</h2><p>Un QCM, une explication avec tes mots ou un lab guidé.</p><button data-view="entrainement">Choisir ma séance →</button></article>`;
+ $('study-actions').innerHTML=`<article class="panel"><span class="eyebrow">01 · APPRENDRE</span><h2>Reprendre mon cours</h2><p>${recent?esc(recent.title):state.documents.length?'Choisis un de tes supports pour poursuivre.':'Ajoute un support pour commencer ton parcours.'}</p>${recent?`<button class="primary" data-session="${recent.id}">Reprendre →</button>`:`<button class="primary" data-view="cours">${state.documents.length?'Ouvrir mes cours':'Ajouter mon premier cours'} →</button>`}</article><article class="panel"><span class="eyebrow">02 · RETENIR</span><h2>Réviser mes difficultés</h2><p>${due.length} difficulté(s) et ${cards.length} carte(s) à revoir aujourd’hui.</p><button data-view="revisions">Ouvrir mes révisions →</button></article><article class="panel"><span class="eyebrow">03 · PRATIQUER</span><h2>Faire un exercice</h2><p>Un QCM, une explication avec tes mots ou un lab guidé.</p><button data-view="entrainement">Choisir ma séance →</button></article>`;
  $('study-focus').innerHTML=due.length?due.slice(0,3).map(r=>`<div class="study-focus-item"><strong>${esc(r.question)}</strong><p class="muted small">${esc(r.document_title||'Connaissances générales')}</p><button data-view="revisions">Revoir la correction →</button></div>`).join(''):empty('Rien d’urgent à réviser',reviews.length?'Tes prochaines révisions sont planifiées. Tu peux commencer un exercice.':'Tes futures erreurs de QCM apparaîtront ici, avec leurs sources.');
  const selected=$('practice-document').value;
  $('practice-document').innerHTML=state.documents.length?state.documents.map(d=>`<option value="${d.id}">${esc(d.title)}</option>`).join(''):'<option value="">Ajoute un support dans Mes cours</option>';
